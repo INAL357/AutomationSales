@@ -1,0 +1,69 @@
+#  MAIL_PASSWORD : bteu iccr erje vouf
+
+spring:
+  application:
+    name: AutomationSales
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/automationDB
+    username: postgres
+    password: Inal@014!
+
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+    #----------------------------------------------------
+    #Steps to generate App Password:
+    #Login to Gmail
+    #Manage your Google Account
+    #Security
+    #Enable 2-Step Verification
+    #Go to App Passwords
+    #Select app with a custom name
+    #Click Generate
+  #-----------------------------------------------------
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: inalmendonca2@gmail.com
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+
+# ---------------- Security / JWT ----------------
+app:
+  jwt:
+    # Base64 key, at least 32 bytes. The default below is for LOCAL DEV ONLY –
+    # anywhere else set JWT_SECRET (generate one with: openssl rand -base64 48)
+    secret: ${JWT_SECRET}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES}
+    issuer: AutomationSales
+
+  security:
+    # First ADMIN is created on startup only if the users table is empty
+    bootstrap-admin:
+      email: ${ADMIN_EMAIL}
+      password: ${ADMIN_PASSWORD}
+      full-name: Administrator
+
+# ---------------- Renewal automation ----------------
+  renewal:
+    # Days before expiry when a renewal reminder + sales task is created
+    reminder-days: 90,60,30,14,7
+
+    # Licences with this many days (or fewer) left are marked EXPIRING_SOON
+    expiring-soon-days: 90
+
+    # Automatic tasks are due this many days after they are created
+    task-due-in-days: 3
+
+    # Every day at 08:00
+    scheduler-cron: "0 0 8 * * *"

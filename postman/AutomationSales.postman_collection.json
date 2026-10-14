@@ -1,0 +1,1117 @@
+{
+  "info": {
+    "name": "AutomationSales - Validation & Renewal Automation",
+    "description": "Run the folders in order (1 -> 6). Use Collection Runner to run everything at once.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Builds dates relative to today, so the tests work whenever you run them.",
+          "function d(days) {",
+          "  const t = new Date(); t.setDate(t.getDate() + days);",
+          "  const p = n => String(n).padStart(2, '0');",
+          "  return t.getFullYear() + '-' + p(t.getMonth()+1) + '-' + p(t.getDate()) + 'T10:00:00';",
+          "}",
+          "pm.collectionVariables.set('today', d(0));",
+          "pm.collectionVariables.set('lastYear', d(-365));",
+          "pm.collectionVariables.set('in58Days', d(58));",
+          "pm.collectionVariables.set('in5Days', d(5));",
+          "pm.collectionVariables.set('threeDaysAgo', d(-3));",
+          "pm.collectionVariables.set('uniq', Date.now());"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "adminEmail",
+      "value": "admin@automationsales.local"
+    },
+    {
+      "key": "adminPassword",
+      "value": "ChangeMe123!"
+    },
+    {
+      "key": "token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "0 - Auth (run first)",
+      "item": [
+        {
+          "name": "Login as admin (saves token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"token\", pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Who am I",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Wrong password -> 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"wrong-password\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "No token -> 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/customers",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bad token -> 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/customers",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "not.a.real.token",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List users (ADMIN)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1 - Setup data",
+      "item": [
+        {
+          "name": "Create salesperson",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/salespersons",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"salesPersonName\": \"John Smith\",\n  \"salesPersonEmail\": \"john{{uniq}}@company.com\",\n  \"salesPersonNumber\": \"+971 50 123 4567\",\n  \"salesPersonRole\": \"ACCOUNT_MANAGER\",\n  \"status\": \"ACTIVE\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"salespersonId\", pm.response.json().salesPersonId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/customers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerName\": \"ABC Technologies\",\n  \"customerEmail\": \"it@abctech.com\",\n  \"customerPhone\": \"+971 4 555 1234\",\n  \"companyName\": \"ABC Technologies LLC\",\n  \"salespersonId\": {{salespersonId}},\n  \"status\": \"ACTIVE\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"customerId\", pm.response.json().customerId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create vendor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/vendors",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vendorName\": \"Autodesk\",\n  \"vendorDescription\": \"CAD software vendor\",\n  \"vendorEmail\": \"sales{{uniq}}@vendor.com\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"vendorId\", pm.response.json().vendorId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create product",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/products",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vendorId\": {{vendorId}},\n  \"productName\": \"AutoCAD\",\n  \"productDescription\": \"2D/3D CAD\",\n  \"productPrice\": 1800.0,\n  \"category\": \"CAD\",\n  \"version\": \"2027\",\n  \"platform\": \"Windows\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"productId\", pm.response.json().productId);",
+                  "pm.test(\"active defaults to true\", () => pm.expect(pm.response.json().active).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 - Licences (status + daysRemaining)",
+      "item": [
+        {
+          "name": "Licence expiring in 58 days",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/licenses",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": {{productId}},\n  \"customerId\": {{customerId}},\n  \"salespersonId\": {{salespersonId}},\n  \"licenseQuantity\": 20,\n  \"purchaseDate\": \"{{lastYear}}\",\n  \"expiryDate\": \"{{in58Days}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"licence58Id\", pm.response.json().licenseId);",
+                  "pm.test(\"status EXPIRING_SOON\", () => pm.expect(pm.response.json().status).to.eql(\"EXPIRING_SOON\"));",
+                  "pm.test(\"58 days remaining\", () => pm.expect(pm.response.json().daysRemaining).to.eql(58));",
+                  "pm.test(\"durationMonths calculated\", () => pm.expect(pm.response.json().durationMonths).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Licence expiring in 5 days",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/licenses",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": {{productId}},\n  \"customerId\": {{customerId}},\n  \"salespersonId\": {{salespersonId}},\n  \"licenseQuantity\": 5,\n  \"purchaseDate\": \"{{lastYear}}\",\n  \"expiryDate\": \"{{in5Days}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"licence5Id\", pm.response.json().licenseId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Licence 12 months from today (expiry calculated)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/licenses",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": {{productId}},\n  \"customerId\": {{customerId}},\n  \"salespersonId\": {{salespersonId}},\n  \"licenseQuantity\": 10,\n  \"purchaseDate\": \"{{today}}\",\n  \"durationMonths\": 12\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"licenceActiveId\", pm.response.json().licenseId);",
+                  "pm.test(\"status ACTIVE\", () => pm.expect(pm.response.json().status).to.eql(\"ACTIVE\"));",
+                  "pm.test(\"expiryDate filled in\", () => pm.expect(pm.response.json().expiryDate).to.not.be.null);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Licence already expired",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/licenses",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": {{productId}},\n  \"customerId\": {{customerId}},\n  \"licenseQuantity\": 3,\n  \"purchaseDate\": \"{{lastYear}}\",\n  \"expiryDate\": \"{{threeDaysAgo}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"licenceExpiredId\", pm.response.json().licenseId);",
+                  "pm.test(\"status EXPIRED\", () => pm.expect(pm.response.json().status).to.eql(\"EXPIRED\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 - Expiry queries",
+      "item": [
+        {
+          "name": "Expiring within 60 days",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/licenses/expiring?days=60"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const ids = pm.response.json().map(l => l.licenseId);",
+                  "pm.test(\"contains 58-day licence\", () => pm.expect(ids).to.include(pm.collectionVariables.get(\"licence58Id\") * 1));",
+                  "pm.test(\"does not contain 12-month licence\", () => pm.expect(ids).to.not.include(pm.collectionVariables.get(\"licenceActiveId\") * 1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Expired licences",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/licenses/expired"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const ids = pm.response.json().map(l => l.licenseId);",
+                  "pm.test(\"contains expired licence\", () => pm.expect(ids).to.include(pm.collectionVariables.get(\"licenceExpiredId\") * 1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Is 58-day licence expiring within 60 days?",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/licenses/{{licence58Id}}/expiring-soon?days=60"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"true\", () => pm.expect(pm.response.json()).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Licences with status EXPIRING_SOON",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/licenses/status/EXPIRING_SOON"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 - Renewal automation",
+      "item": [
+        {
+          "name": "Run renewal check now",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/renewals/automation/run",
+            "description": "Same thing the scheduler does every day at 08:00."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"created tasks\", () => pm.expect(pm.response.json().tasksCreated).to.be.at.least(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tasks for 58-day licence",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/sales-tasks/license/{{licence58Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const t = pm.response.json();",
+                  "pm.test(\"one task\", () => pm.expect(t.length).to.eql(1));",
+                  "pm.test(\"OPEN, LOW priority (58 days)\", () => { pm.expect(t[0].taskStatus).to.eql(\"OPEN\"); pm.expect(t[0].priority).to.eql(\"LOW\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tasks for 5-day licence (URGENT)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/sales-tasks/license/{{licence5Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"URGENT\", () => pm.expect(pm.response.json()[0].priority).to.eql(\"URGENT\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Notifications for customer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/notifications/customer/{{customerId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"internal + customer reminders\", () => pm.expect(pm.response.json().length).to.be.at.least(4));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Renewal created for 58-day licence",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/renewals/license/{{licence58Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"one PENDING renewal at stage 60\", () => { pm.expect(r.length).to.eql(1); pm.expect(r[0].status).to.eql(\"PENDING\"); pm.expect(r[0].lastReminderDays).to.eql(60); });",
+                  "pm.collectionVariables.set(\"renewalId\", r[0].renewalId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Run again (must NOT duplicate)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/renewals/automation/run"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"no new tasks\", () => pm.expect(pm.response.json().tasksCreated).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Customer renewed -> mark renewal RENEWED",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": "{{baseUrl}}/api/renewals/{{renewalId}}/status?status=RENEWED"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"RENEWED\", () => pm.expect(pm.response.json().status).to.eql(\"RENEWED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Licence is now RENEWED",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/licenses/{{licence58Id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"licence RENEWED\", () => pm.expect(pm.response.json().status).to.eql(\"RENEWED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Open task was cancelled",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/sales-tasks/renewal/{{renewalId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"CANCELLED\", () => pm.expect(pm.response.json()[0].taskStatus).to.eql(\"CANCELLED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Salesperson's open tasks",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/sales-tasks/salesperson/{{salespersonId}}/status?taskStatus=OPEN"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5 - Validation errors",
+      "item": [
+        {
+          "name": "Customer - blank name + bad email -> 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/customers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerName\": \"\",\n  \"customerEmail\": \"not-an-email\",\n  \"companyName\": \"X\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "const b = pm.response.json();",
+                  "pm.test(\"fieldErrors for both fields\", () => { pm.expect(b.fieldErrors).to.have.property(\"customerName\"); pm.expect(b.fieldErrors).to.have.property(\"customerEmail\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Licence - quantity 0, no productId -> 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/licenses",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": {{customerId}},\n  \"licenseQuantity\": 0,\n  \"purchaseDate\": \"{{today}}\",\n  \"durationMonths\": 12\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"fieldErrors\", () => { const f = pm.response.json().fieldErrors; pm.expect(f).to.have.property(\"productId\"); pm.expect(f).to.have.property(\"licenseQuantity\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Licence - no expiryDate and no durationMonths -> 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/licenses",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": {{productId}},\n  \"customerId\": {{customerId}},\n  \"licenseQuantity\": 5,\n  \"purchaseDate\": \"{{today}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"message\", () => pm.expect(pm.response.json().message).to.include(\"expiryDate or durationMonths\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Licence - expiry before purchase -> 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/licenses",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": {{productId}},\n  \"customerId\": {{customerId}},\n  \"licenseQuantity\": 5,\n  \"purchaseDate\": \"{{today}}\",\n  \"expiryDate\": \"{{threeDaysAgo}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Customer id not found -> 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/customers/999999"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Task - unknown priority -> 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/sales-tasks",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Test\",\n  \"priority\": \"SUPER\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Licence status WRONG in URL -> 400",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/licenses/status/WRONG"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lead - invalid phone + score 150 -> 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/leads",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"leadName\": \"James\",\n  \"email\": \"james@futuretech.com\",\n  \"phone\": \"abc\",\n  \"leadScore\": 150\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"fieldErrors\", () => { const f = pm.response.json().fieldErrors; pm.expect(f).to.have.property(\"phone\"); pm.expect(f).to.have.property(\"leadScore\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Call - no customer or lead -> 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/sales-calls",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"callType\": \"RENEWAL\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 - Leads, calls, tasks",
+      "item": [
+        {
+          "name": "Create qualified lead",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/leads",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"leadName\": \"James\",\n  \"companyName\": \"FutureTech\",\n  \"email\": \"james@futuretech.com\",\n  \"phone\": \"+971 55 987 6543\",\n  \"productId\": {{productId}},\n  \"salespersonId\": {{salespersonId}},\n  \"message\": \"Need AutoCAD for design team\",\n  \"requiredLicenses\": 20,\n  \"existingLicenses\": 10,\n  \"preferredDurationMonths\": 36,\n  \"purchaseTimeline\": \"Within 1 month\",\n  \"leadScore\": 80\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"leadId\", pm.response.json().leadId);",
+                  "pm.test(\"defaults: status NEW, source WEBSITE\", () => { pm.expect(pm.response.json().status).to.eql(\"NEW\"); pm.expect(pm.response.json().source).to.eql(\"WEBSITE\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log a sales call",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/sales-calls",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": {{customerId}},\n  \"salespersonId\": {{salespersonId}},\n  \"licenseId\": {{licence5Id}},\n  \"callType\": \"RENEWAL\",\n  \"callStatus\": \"COMPLETED\",\n  \"startTime\": \"{{today}}\",\n  \"callSummary\": \"Customer wants 25 licences for 3 years\",\n  \"outcome\": \"INTERESTED\",\n  \"nextAction\": \"Prepare quotation\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create manual task",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/sales-tasks",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Prepare quotation for FutureTech\",\n  \"leadId\": {{leadId}},\n  \"salespersonId\": {{salespersonId}},\n  \"priority\": \"HIGH\",\n  \"dueDate\": \"2030-01-01\",\n  \"taskType\": \"LEAD_FOLLOW_UP\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"taskId\", pm.response.json().salesTaskId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark task DONE",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": "{{baseUrl}}/api/sales-tasks/{{taskId}}/status?taskStatus=DONE"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"DONE\", () => pm.expect(pm.response.json().taskStatus).to.eql(\"DONE\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  }
+}
