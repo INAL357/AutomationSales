@@ -46,4 +46,4 @@ services:
 databases:
   - name: automationsales-db
     plan: free
-    databaseName: automationDB
+    databaseName: automationdb
