@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: automationsales-backend
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: DB_HOST
+        fromDatabase:
+          name: automationsales-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: automationsales-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: automationsales-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: automationsales-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: automationsales-db
+          property: password
+      - key: SPRING_JPA_SHOW_SQL
+        value: "false"
+      - key: JWT_EXPIRATION_MINUTES
+        value: "60"
+      - key: TZ
+        value: Asia/Riyadh
+      - key: JAVA_OPTS
+        value: "-XX:MaxRAMPercentage=70 -XX:+UseSerialGC"
+      - key: JWT_SECRET
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+
+databases:
+  - name: automationsales-db
+    plan: free
+    databaseName: automationDB
