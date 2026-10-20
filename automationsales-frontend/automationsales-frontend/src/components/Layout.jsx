@@ -35,7 +35,7 @@ export default function Layout() {
   return (
     <div className={menuOpen ? 'layout menu-open' : 'layout'}>
       <aside className="sidebar">
-        <div className="brand-logo"><span className="logo-mark">A</span> AutomationSales</div>
+        <div className="brand-logo"><span className="logo-mark">S</span> SalesSoftware</div>
 
         <nav className="menu">
           {visibleMenu.map((item) => (
@@ -70,7 +70,7 @@ export default function Layout() {
       <div className="content">
         <header className="topbar">
           <button className="icon-button" onClick={() => setMenuOpen(true)} aria-label="Open menu">☰</button>
-          <span className="topbar-brand">AutomationSales</span>
+          <span className="topbar-brand">SalesSoftware</span>
         </header>
         <main className="main">
           <Outlet />

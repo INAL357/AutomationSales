@@ -45,7 +45,7 @@ export default function RequestDemoPage() {
   return (
     <div className="public-page">
       <header className="public-header">
-        <div className="brand-logo"><span className="logo-mark">A</span> AutomationSales</div>
+        <div className="brand-logo"><span className="logo-mark">A</span> Sales Software</div>
         <Link to="/login">Staff sign in</Link>
       </header>
 

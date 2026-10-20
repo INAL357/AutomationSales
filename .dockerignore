@@ -1,0 +1,10 @@
+target/
+.git/
+.idea/
+*.iml
+.env
+automationsales-frontend/
+postman/
+Backend/
+config/
+*.md

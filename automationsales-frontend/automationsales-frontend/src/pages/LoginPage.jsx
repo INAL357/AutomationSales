@@ -41,7 +41,7 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <section className="login-brand">
-        <div className="brand-logo"><span className="logo-mark">A</span> AutomationSales</div>
+        <div className="brand-logo"><span className="logo-mark">S</span> SalesSoftware</div>
         <div>
           <h1>Never miss a renewal again.</h1>
           <p>Leads, customers, licences and renewals in one place. Reminders and follow-up tasks are created for you automatically.</p>
